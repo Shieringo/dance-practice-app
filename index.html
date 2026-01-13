@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ダンス練習アプリ（スマホ2台版）</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        }
+        * {
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useRef, useEffect } = React;
+
+        // SVGアイコン
+        const Upload = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+            </svg>
+        );
+
+        const Play = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
+        );
+
+        const Pause = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="6" y="4" width="4" height="16"></rect>
+                <rect x="14" y="4" width="4" height="16"></rect>
+            </svg>
+        );
+
+        const RotateCcw = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="1 4 1 10 7 10"></polyline>
+                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path>
+            </svg>
+        );
+
+        const Monitor = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                <line x1="8" y1="21" x2="16" y2="21"></line>
+                <line x1="12" y1="17" x2="12" y2="21"></line>
+            </svg>
+        );
+
+        const Smartphone = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
+                <line x1="12" y1="18" x2="12.01" y2="18"></line>
+            </svg>
+        );
+
+        const Wifi = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+                <path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+                <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+                <line x1="12" y1="20" x2="12.01" y2="20"></line>
+            </svg>
+        );
+
+        const Camera = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+                <circle cx="12" cy="13" r="4"></circle>
+            </svg>
+        );
+
+        const Video = () => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="23 7 16 12 23 17 23 7"></polygon>
+                <rect x="1" y="5" width="15" height="14" rx="2" ry="2"></rect>
+            </svg>
+        );
+
+        const DancePracticeApp = () => {
+            const [mode, setMode] = useState('select');
+            const [roomCode, setRoomCode] = useState('');
+            const [isConnected, setIsConnected] = useState(false);
+            const [videoFile, setVideoFile] = useState(null);
+            const [videoUrl, setVideoUrl] = useState('');
+            const [isPlaying, setIsPlaying] = useState(false);
+            const [connectionError, setConnectionError] = useState('');
+            const [cameraConnected, setCameraConnected] = useState(false);
+            
+            const videoRef = useRef(null);
+            const cameraVideoRef = useRef(null);
+            const canvasRef = useRef(null);
+            const streamIntervalRef = useRef(null);
+
+            useEffect(() => {
+                if (mode === 'controller' || mode === 'display' || mode === 'camera') {
+                    const handleStorageChange = (e) => {
+                        if (e.key === `dance-app-${roomCode}`) {
+                            const data = JSON.parse(e.newValue);
+                            handleMessage(data);
+                        }
+                    };
+                    
+                    const handleCustomEvent = (e) => {
+                        if (e.detail.roomCode === roomCode) {
+                            handleMessage(e.detail.data);
+                        }
+                    };
+
+                    window.addEventListener('storage', handleStorageChange);
+                    window.addEventListener('danceAppMessage', handleCustomEvent);
+                    
+                    return () => {
+                        window.removeEventListener('storage', handleStorageChange);
+                        window.removeEventListener('danceAppMessage', handleCustomEvent);
+                    };
+                }
+            }, [mode, roomCode]);
+
+            const sendMessage = (data) => {
+                const message = { ...data, roomCode, timestamp: Date.now() };
+                localStorage.setItem(`dance-app-${roomCode}`, JSON.stringify(message));
+                
+                window.dispatchEvent(new CustomEvent('danceAppMessage', { 
+                    detail: { roomCode, data: message }
+                }));
+            };
+
+            const handleMessage = (data) => {
+                if (data.type === 'video-upload') {
+                    setVideoUrl(data.videoUrl);
+                    setIsConnected(true);
+                } else if (data.type === 'play') {
+                    if (videoRef.current) {
+                        videoRef.current.play();
+                        setIsPlaying(true);
+                    }
+                } else if (data.type === 'pause') {
+                    if (videoRef.current) {
+                        videoRef.current.pause();
+                        setIsPlaying(false);
+                    }
+                } else if (data.type === 'reset') {
+                    if (videoRef.current) {
+                        videoRef.current.currentTime = 0;
+                        videoRef.current.pause();
+                        setIsPlaying(false);
+                    }
+                } else if (data.type === 'connect-display') {
+                    setIsConnected(true);
+                } else if (data.type === 'connect-camera') {
+                    setCameraConnected(true);
+                } else if (data.type === 'camera-frame') {
+                    // カメラ映像のフレームを受信
+                    if (mode === 'display' && data.frame) {
+                        const img = new Image();
+                        img.onload = () => {
+                            if (canvasRef.current) {
+                                const ctx = canvasRef.current.getContext('2d');
+                                canvasRef.current.width = img.width;
+                                canvasRef.current.height = img.height;
+                                // 鏡モード（左右反転）
+                                ctx.save();
+                                ctx.scale(-1, 1);
+                                ctx.drawImage(img, -img.width, 0, img.width, img.height);
+                                ctx.restore();
+                            }
+                        };
+                        img.src = data.frame;
+                    }
+                }
+            };
+
+            const generateRoomCode = () => {
+                return Math.random().toString(36).substring(2, 8).toUpperCase();
+            };
+
+            const startController = () => {
+                const code = generateRoomCode();
+                setRoomCode(code);
+                setMode('controller');
+            };
+
+            const startCamera = () => {
+                setMode('camera');
+            };
+
+            const startDisplay = () => {
+                setMode('display');
+            };
+
+            const connectToRoomAsCamera = () => {
+                if (roomCode.trim().length === 6) {
+                    setMode('camera');
+                    sendMessage({ type: 'connect-camera' });
+                } else {
+                    setConnectionError('6文字のルームコードを入力してください');
+                }
+            };
+
+            const connectToRoomAsDisplay = () => {
+                if (roomCode.trim().length === 6) {
+                    setMode('display');
+                    sendMessage({ type: 'connect-display' });
+                } else {
+                    setConnectionError('6文字のルームコードを入力してください');
+                }
+            };
+
+            const handleVideoUpload = (e) => {
+                const file = e.target.files[0];
+                if (file && file.type.startsWith('video/')) {
+                    setVideoFile(file);
+                    const url = URL.createObjectURL(file);
+                    setVideoUrl(url);
+                    sendMessage({ type: 'video-upload', videoUrl: url });
+                }
+            };
+
+            const togglePlay = () => {
+                if (isPlaying) {
+                    sendMessage({ type: 'pause' });
+                } else {
+                    sendMessage({ type: 'play' });
+                }
+            };
+
+            const resetVideo = () => {
+                sendMessage({ type: 'reset' });
+            };
+
+            // カメラモード: カメラ映像をキャプチャして送信
+            useEffect(() => {
+                if (mode === 'camera' && cameraVideoRef.current) {
+                    navigator.mediaDevices.getUserMedia({ 
+                        video: { 
+                            facingMode: 'user',
+                            width: { ideal: 1280 },
+                            height: { ideal: 720 }
+                        } 
+                    })
+                    .then(stream => {
+                        cameraVideoRef.current.srcObject = stream;
+                        
+                        // フレームを定期的にキャプチャして送信
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        streamIntervalRef.current = setInterval(() => {
+                            if (cameraVideoRef.current && cameraVideoRef.current.readyState === cameraVideoRef.current.HAVE_ENOUGH_DATA) {
+                                canvas.width = cameraVideoRef.current.videoWidth;
+                                canvas.height = cameraVideoRef.current.videoHeight;
+                                ctx.drawImage(cameraVideoRef.current, 0, 0);
+                                
+                                // 画像をBase64に変換して送信（品質を下げてデータサイズを削減）
+                                const frame = canvas.toDataURL('image/jpeg', 0.6);
+                                sendMessage({ type: 'camera-frame', frame });
+                            }
+                        }, 100); // 10FPS
+                    })
+                    .catch(err => {
+                        console.error('カメラアクセスエラー:', err);
+                        alert('カメラへのアクセスを許可してください');
+                    });
+
+                    return () => {
+                        if (streamIntervalRef.current) {
+                            clearInterval(streamIntervalRef.current);
+                        }
+                        if (cameraVideoRef.current && cameraVideoRef.current.srcObject) {
+                            cameraVideoRef.current.srcObject.getTracks().forEach(track => track.stop());
+                        }
+                    };
+                }
+            }, [mode, roomCode]);
+
+            // モード選択画面
+            if (mode === 'select') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center p-4">
+                        <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full">
+                            <div className="text-center mb-8">
+                                <h1 className="text-4xl font-bold text-gray-800 mb-2">🕺 ダンス練習</h1>
+                                <p className="text-gray-600 mb-1">スマホ2台でテスト版</p>
+                                <p className="text-sm text-gray-500">見本と自分を見比べながら練習しよう！</p>
+                            </div>
+                            
+                            <div className="space-y-4">
+                                <button
+                                    onClick={startController}
+                                    className="w-full bg-blue-500 hover:bg-blue-600 text-white rounded-xl p-6 flex items-center justify-between transition-all transform hover:scale-105"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-8 h-8"><Smartphone /></div>
+                                        <div className="text-left">
+                                            <div className="font-bold text-lg">📱 スマホA</div>
+                                            <div className="text-sm opacity-90">コントローラー（操作用）</div>
+                                        </div>
+                                    </div>
+                                    <div className="text-2xl">→</div>
+                                </button>
+
+                                <button
+                                    onClick={startCamera}
+                                    className="w-full bg-pink-500 hover:bg-pink-600 text-white rounded-xl p-6 flex items-center justify-between transition-all transform hover:scale-105"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-8 h-8"><Camera /></div>
+                                        <div className="text-left">
+                                            <div className="font-bold text-lg">📱 スマホB</div>
+                                            <div className="text-sm opacity-90">カメラ（撮影用）</div>
+                                        </div>
+                                    </div>
+                                    <div className="text-2xl">→</div>
+                                </button>
+
+                                <button
+                                    onClick={startDisplay}
+                                    className="w-full bg-purple-500 hover:bg-purple-600 text-white rounded-xl p-6 flex items-center justify-between transition-all transform hover:scale-105"
+                                >
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-8 h-8"><Monitor /></div>
+                                        <div className="text-left">
+                                            <div className="font-bold text-lg">🖥️ テレビ/PC</div>
+                                            <div className="text-sm opacity-90">ディスプレイ（表示用）</div>
+                                        </div>
+                                    </div>
+                                    <div className="text-2xl">→</div>
+                                </button>
+                            </div>
+
+                            <div className="mt-8 pt-6 border-t border-gray-200">
+                                <div className="flex items-start gap-3 text-sm text-gray-600">
+                                    <div className="w-5 h-5 mt-0.5 flex-shrink-0"><Wifi /></div>
+                                    <p>3つのデバイスを同じWi-Fiネットワークに接続してください</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // コントローラー画面（スマホA）
+            if (mode === 'controller') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-500 to-cyan-500 p-4">
+                        <div className="max-w-md mx-auto">
+                            <div className="bg-white rounded-3xl shadow-2xl p-6 mb-4">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h2 className="text-2xl font-bold text-gray-800">📱 スマホA</h2>
+                                    <button
+                                        onClick={() => setMode('select')}
+                                        className="text-gray-500 hover:text-gray-700"
+                                    >
+                                        ✕
+                                    </button>
+                                </div>
+
+                                <div className="bg-gradient-to-r from-purple-100 to-pink-100 rounded-2xl p-6 mb-6">
+                                    <div className="text-center">
+                                        <div className="text-sm text-gray-600 mb-2">ルームコード</div>
+                                        <div className="text-4xl font-bold text-purple-700 tracking-widest mb-2">
+                                            {roomCode}
+                                        </div>
+                                        <div className="text-xs text-gray-600">
+                                            スマホBとテレビでこのコードを入力
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {!videoFile ? (
+                                    <div className="border-4 border-dashed border-gray-300 rounded-2xl p-8 text-center">
+                                        <div className="w-16 h-16 mx-auto mb-4 text-gray-400"><Upload /></div>
+                                        <p className="text-gray-600 mb-4">見本動画をアップロード</p>
+                                        <label className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-3 rounded-xl cursor-pointer inline-block transition-all transform hover:scale-105">
+                                            ファイルを選択
+                                            <input
+                                                type="file"
+                                                accept="video/*"
+                                                onChange={handleVideoUpload}
+                                                className="hidden"
+                                            />
+                                        </label>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <div className="bg-gray-100 rounded-2xl p-4 mb-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center">
+                                                    <div className="w-6 h-6 text-white"><Play /></div>
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="font-semibold text-gray-800">
+                                                        {videoFile.name}
+                                                    </div>
+                                                    <div className="text-sm text-gray-500">
+                                                        {(videoFile.size / 1024 / 1024).toFixed(2)} MB
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-3 gap-3">
+                                            <button
+                                                onClick={togglePlay}
+                                                className={`${isPlaying ? 'bg-orange-500 hover:bg-orange-600' : 'bg-green-500 hover:bg-green-600'} text-white rounded-xl p-4 flex flex-col items-center gap-2 transition-all transform hover:scale-105`}
+                                            >
+                                                <div className="w-8 h-8">{isPlaying ? <Pause /> : <Play />}</div>
+                                                <span className="text-sm font-semibold">
+                                                    {isPlaying ? '一時停止' : '再生'}
+                                                </span>
+                                            </button>
+
+                                            <button
+                                                onClick={resetVideo}
+                                                className="bg-blue-500 hover:bg-blue-600 text-white rounded-xl p-4 flex flex-col items-center gap-2 transition-all transform hover:scale-105"
+                                            >
+                                                <div className="w-8 h-8"><RotateCcw /></div>
+                                                <span className="text-sm font-semibold">最初から</span>
+                                            </button>
+
+                                            <label className="bg-purple-500 hover:bg-purple-600 text-white rounded-xl p-4 flex flex-col items-center gap-2 cursor-pointer transition-all transform hover:scale-105">
+                                                <div className="w-8 h-8"><Upload /></div>
+                                                <span className="text-sm font-semibold">変更</span>
+                                                <input
+                                                    type="file"
+                                                    accept="video/*"
+                                                    onChange={handleVideoUpload}
+                                                    className="hidden"
+                                                />
+                                            </label>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="bg-white/90 rounded-2xl p-4">
+                                <div className="flex items-center justify-center gap-2 text-sm text-gray-600 mb-3">
+                                    <div className="w-4 h-4"><Wifi /></div>
+                                    <span>接続状態</span>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 text-xs">
+                                    <div className={`p-2 rounded-lg text-center ${cameraConnected ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                        📱 スマホB {cameraConnected ? '✓' : '待機中'}
+                                    </div>
+                                    <div className={`p-2 rounded-lg text-center ${isConnected ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                                        🖥️ テレビ {isConnected ? '✓' : '待機中'}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+
+            // カメラ画面（スマホB）
+            if (mode === 'camera') {
+                return (
+                    <div className="min-h-screen bg-black">
+                        {roomCode === '' ? (
+                            <div className="min-h-screen flex items-center justify-center p-8">
+                                <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-lg w-full">
+                                    <div className="text-center mb-8">
+                                        <div className="w-20 h-20 mx-auto mb-4 text-pink-500"><Camera /></div>
+                                        <h2 className="text-3xl font-bold text-gray-800 mb-2">📱 スマホB（カメラ）</h2>
+                                        <p className="text-gray-600">スマホAのルームコードを入力してください</p>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <input
+                                            type="text"
+                                            placeholder="例: ABC123"
+                                            value={roomCode}
+                                            onChange={(e) => {
+                                                setRoomCode(e.target.value.toUpperCase());
+                                                setConnectionError('');
+                                            }}
+                                            maxLength={6}
+                                            className="w-full text-center text-3xl font-bold tracking-widest border-4 border-gray-300 rounded-2xl p-6 focus:outline-none focus:border-pink-500 uppercase"
+                                        />
+
+                                        {connectionError && (
+                                            <div className="bg-red-100 text-red-700 rounded-xl p-4 text-center">
+                                                {connectionError}
+                                            </div>
+                                        )}
+
+                                        <button
+                                            onClick={connectToRoomAsCamera}
+                                            disabled={roomCode.length !== 6}
+                                            className="w-full bg-pink-500 hover:bg-pink-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-2xl p-6 text-xl font-bold transition-all transform hover:scale-105 disabled:transform-none"
+                                        >
+                                            カメラとして接続
+                                        </button>
+
+                                        <button
+                                            onClick={() => setMode('select')}
+                                            className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-2xl p-4 transition-all"
+                                        >
+                                            戻る
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="min-h-screen flex flex-col">
+                                <div className="flex-1 relative flex items-center justify-center">
+                                    <video
+                                        ref={cameraVideoRef}
+                                        autoPlay
+                                        playsInline
+                                        muted
+                                        className="w-full h-full object-cover"
+                                        style={{ transform: 'scaleX(-1)' }}
+                                    />
+                                    <div className="absolute top-6 left-6 bg-pink-500 text-white px-6 py-3 rounded-full font-bold text-xl shadow-lg">
+                                        📱 カメラ起動中
+                                    </div>
+                                    <div className="absolute bottom-6 left-6 right-6">
+                                        <div className="bg-black/70 text-white rounded-2xl p-4">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-sm">ルームコード</span>
+                                                <span className="font-bold text-lg tracking-wider">{roomCode}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-sm text-green-400">
+                                                <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                                                <span>カメラ映像を送信中...</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
+            // ディスプレイ画面（テレビ/PC）
+            if (mode === 'display') {
+                return (
+                    <div className="min-h-screen bg-black">
+                        {!isConnected ? (
+                            <div className="min-h-screen flex items-center justify-center p-8">
+                                <div className="bg-white rounded-3xl shadow-2xl p-12 max-w-lg w-full">
+                                    <div className="text-center mb-8">
+                                        <div className="w-20 h-20 mx-auto mb-4 text-purple-500"><Monitor /></div>
+                                        <h2 className="text-3xl font-bold text-gray-800 mb-2">🖥️ テレビ/PC</h2>
+                                        <p className="text-gray-600">スマホAのルームコードを入力してください</p>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <input
+                                            type="text"
+                                            placeholder="例: ABC123"
+                                            value={roomCode}
+                                            onChange={(e) => {
+                                                setRoomCode(e.target.value.toUpperCase());
+                                                setConnectionError('');
+                                            }}
+                                            maxLength={6}
+                                            className="w-full text-center text-3xl font-bold tracking-widest border-4 border-gray-300 rounded-2xl p-6 focus:outline-none focus:border-purple-500 uppercase"
+                                        />
+
+                                        {connectionError && (
+                                            <div className="bg-red-100 text-red-700 rounded-xl p-4 text-center">
+                                                {connectionError}
+                                            </div>
+                                        )}
+
+                                        <button
+                                            onClick={connectToRoomAsDisplay}
+                                            disabled={roomCode.length !== 6}
+                                            className="w-full bg-purple-500 hover:bg-purple-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-2xl p-6 text-xl font-bold transition-all transform hover:scale-105 disabled:transform-none"
+                                        >
+                                            ディスプレイとして接続
+                                        </button>
+
+                                        <button
+                                            onClick={() => setMode('select')}
+                                            className="w-full bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-2xl p-4 transition-all"
+                                        >
+                                            戻る
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="min-h-screen flex">
+                                {/* 左半分: 見本動画 */}
+                                <div className="w-1/2 bg-gray-900 flex items-center justify-center relative">
+                                    {videoUrl ? (
+                                        <div className="w-full h-full flex items-center justify-center">
+                                            <video
+                                                ref={videoRef}
+                                                src={videoUrl}
+                                                className="max-w-full max-h-full"
+                                                loop
+                                            />
+                                            <div className="absolute top-6 left-6 bg-purple-500 text-white px-6 py-3 rounded-full font-bold text-xl shadow-lg">
+                                                👨‍🏫 見本
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center text-white">
+                                            <div className="w-24 h-24 mx-auto mb-4 opacity-50"><Upload /></div>
+                                            <p className="text-2xl">スマホAから動画をアップロードしてください</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* 右半分: カメラ映像（スマホBから） */}
+                                <div className="w-1/2 bg-black flex items-center justify-center relative">
+                                    <canvas
+                                        ref={canvasRef}
+                                        className="w-full h-full object-cover"
+                                    />
+                                    {!cameraConnected && (
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <div className="text-center text-white">
+                                                <div className="w-24 h-24 mx-auto mb-4 opacity-50"><Camera /></div>
+                                                <p className="text-2xl">スマホBをカメラとして接続してください</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div className="absolute top-6 right-6 bg-pink-500 text-white px-6 py-3 rounded-full font-bold text-xl shadow-lg">
+                                        🎥 あなた
+                                    </div>
+                                    {cameraConnected && (
+                                        <div className="absolute bottom-6 right-6 flex items-center gap-3 bg-black/70 text-white px-4 py-2 rounded-full">
+                                            <div className="w-5 h-5"><Camera /></div>
+                                            <span className="text-sm">スマホB接続中</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            }
+
+            return null;
+        };
+
+        ReactDOM.render(<DancePracticeApp />, document.getElementById('root'));
+    </script>
+</body>
+</html>
