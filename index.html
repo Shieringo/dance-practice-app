@@ -2,8 +2,10 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ダンス練習アプリ（カメラロール対応版）</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>ダンス練習アプリ</title>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -13,9 +15,32 @@
             margin: 0;
             padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            overflow: hidden;
         }
         * {
             box-sizing: border-box;
+        }
+        
+        /* 横向き強制用のスタイル */
+        .landscape-mode {
+            width: 100vw;
+            height: 100vh;
+            position: fixed;
+            top: 0;
+            left: 0;
+        }
+        
+        @media screen and (orientation: portrait) {
+            .landscape-mode {
+                transform: rotate(90deg);
+                transform-origin: left top;
+                width: 100vh;
+                height: 100vw;
+                overflow-x: hidden;
+                position: absolute;
+                top: 100%;
+                left: 0;
+            }
         }
     </style>
 </head>
@@ -106,25 +131,28 @@
             const [connectionError, setConnectionError] = useState('');
             const [cameraConnected, setCameraConnected] = useState(false);
             const [showDisplay, setShowDisplay] = useState(false);
+            const [lastFrameTime, setLastFrameTime] = useState(0);
             
             const videoRef = useRef(null);
             const displayVideoRef = useRef(null);
             const cameraVideoRef = useRef(null);
             const canvasRef = useRef(null);
             const streamIntervalRef = useRef(null);
+            const channelRef = useRef(null);
 
-            // BroadcastChannel通信
+            // BroadcastChannel通信（改善版）
             useEffect(() => {
                 if (roomCode && (mode === 'main' || mode === 'camera')) {
-                    const channel = new BroadcastChannel(`dance-app-${roomCode}`);
+                    // BroadcastChannelを作成
+                    channelRef.current = new BroadcastChannel(`dance-app-${roomCode}`);
                     
-                    channel.onmessage = (event) => {
-                        const data = event.data;
-                        handleMessage(data);
+                    channelRef.current.onmessage = (event) => {
+                        handleMessage(event.data);
                     };
 
+                    // localStorageもフォールバック
                     const handleStorageChange = (e) => {
-                        if (e.key === `dance-app-${roomCode}`) {
+                        if (e.key === `dance-control-${roomCode}`) {
                             try {
                                 const data = JSON.parse(e.newValue);
                                 handleMessage(data);
@@ -137,7 +165,9 @@
                     window.addEventListener('storage', handleStorageChange);
                     
                     return () => {
-                        channel.close();
+                        if (channelRef.current) {
+                            channelRef.current.close();
+                        }
                         window.removeEventListener('storage', handleStorageChange);
                     };
                 }
@@ -146,18 +176,22 @@
             const sendMessage = (data) => {
                 const message = { ...data, roomCode, timestamp: Date.now() };
                 
-                try {
-                    const channel = new BroadcastChannel(`dance-app-${roomCode}`);
-                    channel.postMessage(message);
-                    channel.close();
-                } catch (err) {
-                    console.error('BroadcastChannel error:', err);
+                // BroadcastChannelで送信
+                if (channelRef.current) {
+                    try {
+                        channelRef.current.postMessage(message);
+                    } catch (err) {
+                        console.error('BroadcastChannel send error:', err);
+                    }
                 }
                 
-                try {
-                    localStorage.setItem(`dance-app-${roomCode}`, JSON.stringify(message));
-                } catch (err) {
-                    console.error('localStorage error:', err);
+                // localStorageにも保存（制御用は別キー）
+                if (data.type !== 'camera-frame') {
+                    try {
+                        localStorage.setItem(`dance-control-${roomCode}`, JSON.stringify(message));
+                    } catch (err) {
+                        console.error('localStorage error:', err);
+                    }
                 }
             };
 
@@ -190,16 +224,14 @@
                         displayVideoRef.current.currentTime = 0;
                         displayVideoRef.current.pause();
                     }
-                } else if (data.type === 'seek' && data.time !== undefined) {
-                    if (videoRef.current) {
-                        videoRef.current.currentTime = data.time;
-                    }
-                    if (displayVideoRef.current) {
-                        displayVideoRef.current.currentTime = data.time;
-                    }
                 } else if (data.type === 'connect-camera') {
                     setCameraConnected(true);
                 } else if (data.type === 'camera-frame' && data.frame) {
+                    // フレームレート制限（最大10FPS）
+                    const now = Date.now();
+                    if (now - lastFrameTime < 100) return;
+                    setLastFrameTime(now);
+                    
                     if (canvasRef.current) {
                         const img = new Image();
                         img.onload = () => {
@@ -235,7 +267,10 @@
                 if (code.length === 6) {
                     setRoomCode(code);
                     setMode('camera');
-                    sendMessage({ type: 'connect-camera' });
+                    // 少し遅延させて接続メッセージを送信
+                    setTimeout(() => {
+                        sendMessage({ type: 'connect-camera' });
+                    }, 500);
                     setConnectionError('');
                 } else {
                     setConnectionError('6文字のルームコードを入力してください');
@@ -290,31 +325,14 @@
                 setShowDisplay(!showDisplay);
             };
 
-            // 動画の同期（コントローラー側の動画とディスプレイ側の動画を同期）
-            useEffect(() => {
-                if (videoRef.current && !showDisplay) {
-                    const handleTimeUpdate = () => {
-                        // 時間の同期はリアルタイムには行わない（負荷軽減）
-                    };
-                    
-                    videoRef.current.addEventListener('timeupdate', handleTimeUpdate);
-                    
-                    return () => {
-                        if (videoRef.current) {
-                            videoRef.current.removeEventListener('timeupdate', handleTimeUpdate);
-                        }
-                    };
-                }
-            }, [showDisplay]);
-
-            // カメラ映像送信
+            // カメラ映像送信（改善版）
             useEffect(() => {
                 if (mode === 'camera' && cameraVideoRef.current && roomCode) {
                     navigator.mediaDevices.getUserMedia({ 
                         video: { 
                             facingMode: 'user',
-                            width: { ideal: 1280 },
-                            height: { ideal: 720 }
+                            width: { ideal: 640 },
+                            height: { ideal: 480 }
                         } 
                     })
                     .then(stream => {
@@ -323,14 +341,32 @@
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');
                         
+                        let frameCount = 0;
                         streamIntervalRef.current = setInterval(() => {
                             if (cameraVideoRef.current && cameraVideoRef.current.readyState === cameraVideoRef.current.HAVE_ENOUGH_DATA) {
+                                frameCount++;
+                                // 4フレームに1回送信（約2FPS）
+                                if (frameCount % 4 !== 0) return;
+                                
                                 canvas.width = cameraVideoRef.current.videoWidth;
                                 canvas.height = cameraVideoRef.current.videoHeight;
                                 ctx.drawImage(cameraVideoRef.current, 0, 0);
                                 
-                                const frame = canvas.toDataURL('image/jpeg', 0.4);
-                                sendMessage({ type: 'camera-frame', frame });
+                                const frame = canvas.toDataURL('image/jpeg', 0.3);
+                                
+                                // BroadcastChannelで直接送信
+                                if (channelRef.current) {
+                                    try {
+                                        channelRef.current.postMessage({ 
+                                            type: 'camera-frame', 
+                                            frame,
+                                            roomCode,
+                                            timestamp: Date.now()
+                                        });
+                                    } catch (err) {
+                                        console.error('Frame send error:', err);
+                                    }
+                                }
                             }
                         }, 250);
                     })
@@ -357,8 +393,8 @@
                         <div className="bg-white rounded-3xl shadow-2xl p-8 max-w-md w-full">
                             <div className="text-center mb-8">
                                 <h1 className="text-4xl font-bold text-gray-800 mb-2">🕺 ダンス練習</h1>
-                                <p className="text-gray-600 mb-1">カメラロール対応版</p>
-                                <p className="text-sm text-gray-500">動画サイズ制限なし！</p>
+                                <p className="text-gray-600 mb-1">修正版</p>
+                                <p className="text-sm text-gray-500">横向き表示対応！</p>
                             </div>
                             
                             <div className="space-y-4">
@@ -370,7 +406,7 @@
                                         <div className="w-8 h-8"><Smartphone /></div>
                                         <div className="text-left">
                                             <div className="font-bold text-lg">📱 スマホA</div>
-                                            <div className="text-sm opacity-90">操作 + 表示（AirPlayでテレビへ）</div>
+                                            <div className="text-sm opacity-90">操作 + 表示（AirPlay用）</div>
                                         </div>
                                     </div>
                                     <div className="text-2xl">→</div>
@@ -393,15 +429,9 @@
 
                             <div className="mt-8 pt-6 border-t border-gray-200 space-y-3">
                                 <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-xs text-gray-700">
-                                    <strong>✅ 新機能:</strong><br/>
-                                    カメラロールから直接動画を選択！<br/>
-                                    サイズ制限なし、アップロード不要
-                                </div>
-                                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-gray-700">
-                                    <strong>💡 使い方:</strong><br/>
-                                    1. スマホAで動画を選択<br/>
-                                    2. AirPlayでテレビに映す<br/>
-                                    3. スマホBでカメラ撮影
+                                    <strong>✅ 修正内容:</strong><br/>
+                                    • 横向き（ランドスケープ）表示<br/>
+                                    • カメラ映像通信の改善
                                 </div>
                             </div>
                         </div>
@@ -409,66 +439,67 @@
                 );
             }
 
-            // メイン画面（コントローラー + ディスプレイ）
+            // メイン画面
             if (mode === 'main') {
                 if (showDisplay) {
-                    // フルスクリーン表示モード（AirPlay用）
+                    // 横向き表示モード
                     return (
-                        <div className="min-h-screen bg-black flex">
-                            {/* 左半分: 見本動画 */}
-                            <div className="w-1/2 bg-gray-900 flex items-center justify-center relative">
-                                {videoUrl ? (
-                                    <div className="w-full h-full flex items-center justify-center">
-                                        <video
-                                            ref={displayVideoRef}
-                                            src={videoUrl}
-                                            className="max-w-full max-h-full"
-                                            loop
-                                            playsInline
-                                        />
-                                        <div className="absolute top-6 left-6 bg-purple-500 text-white px-6 py-3 rounded-full font-bold text-xl shadow-lg">
-                                            👨‍🏫 見本
+                        <div className="landscape-mode">
+                            <div className="w-full h-full bg-black flex">
+                                {/* 左半分: 見本動画 */}
+                                <div className="w-1/2 bg-gray-900 flex items-center justify-center relative">
+                                    {videoUrl ? (
+                                        <div className="w-full h-full flex items-center justify-center">
+                                            <video
+                                                ref={displayVideoRef}
+                                                src={videoUrl}
+                                                className="max-w-full max-h-full"
+                                                loop
+                                                playsInline
+                                            />
+                                            <div className="absolute top-6 left-6 bg-purple-500 text-white px-6 py-3 rounded-full font-bold text-xl shadow-lg">
+                                                👨‍🏫 見本
+                                            </div>
                                         </div>
-                                    </div>
-                                ) : (
-                                    <div className="text-center text-white px-4">
-                                        <div className="w-24 h-24 mx-auto mb-4 opacity-50"><Film /></div>
-                                        <p className="text-2xl">動画を選択してください</p>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* 右半分: カメラ映像 */}
-                            <div className="w-1/2 bg-black flex items-center justify-center relative">
-                                <canvas
-                                    ref={canvasRef}
-                                    className="w-full h-full object-cover"
-                                />
-                                {!cameraConnected && (
-                                    <div className="absolute inset-0 flex items-center justify-center">
+                                    ) : (
                                         <div className="text-center text-white px-4">
-                                            <div className="w-24 h-24 mx-auto mb-4 opacity-50"><Camera /></div>
-                                            <p className="text-2xl mb-2">スマホBをカメラとして接続してください</p>
-                                            <p className="text-sm text-gray-400">ルームコード: {roomCode}</p>
+                                            <div className="w-24 h-24 mx-auto mb-4 opacity-50"><Film /></div>
+                                            <p className="text-2xl">動画を選択してください</p>
                                         </div>
-                                    </div>
-                                )}
-                                <div className="absolute top-6 right-6 bg-pink-500 text-white px-6 py-3 rounded-full font-bold text-xl shadow-lg">
-                                    🎥 あなた
+                                    )}
                                 </div>
-                                {cameraConnected && (
-                                    <div className="absolute bottom-6 right-6 flex items-center gap-3 bg-black/70 text-white px-4 py-2 rounded-full">
-                                        <div className="w-5 h-5"><Camera /></div>
-                                        <span className="text-sm">スマホB接続中</span>
+
+                                {/* 右半分: カメラ映像 */}
+                                <div className="w-1/2 bg-black flex items-center justify-center relative">
+                                    <canvas
+                                        ref={canvasRef}
+                                        className="w-full h-full object-contain"
+                                    />
+                                    {!cameraConnected && (
+                                        <div className="absolute inset-0 flex items-center justify-center">
+                                            <div className="text-center text-white px-4">
+                                                <div className="w-24 h-24 mx-auto mb-4 opacity-50"><Camera /></div>
+                                                <p className="text-2xl mb-2">スマホBを接続中...</p>
+                                                <p className="text-sm text-gray-400">ルームコード: {roomCode}</p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div className="absolute top-6 right-6 bg-pink-500 text-white px-6 py-3 rounded-full font-bold text-xl shadow-lg">
+                                        🎥 あなた
                                     </div>
-                                )}
-                                {/* 戻るボタン */}
-                                <button
-                                    onClick={toggleDisplay}
-                                    className="absolute top-6 left-6 bg-gray-700/80 hover:bg-gray-600 text-white p-3 rounded-full"
-                                >
-                                    ✕
-                                </button>
+                                    {cameraConnected && (
+                                        <div className="absolute bottom-6 right-6 flex items-center gap-3 bg-black/70 text-white px-4 py-2 rounded-full">
+                                            <div className="w-5 h-5"><Camera /></div>
+                                            <span className="text-sm">スマホB接続中</span>
+                                        </div>
+                                    )}
+                                    <button
+                                        onClick={toggleDisplay}
+                                        className="absolute top-6 left-6 bg-gray-700/80 hover:bg-gray-600 text-white px-4 py-2 rounded-full text-sm"
+                                    >
+                                        ✕ 戻る
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     );
@@ -505,7 +536,6 @@
                                     <div className="border-4 border-dashed border-gray-300 rounded-2xl p-8 text-center mb-4">
                                         <div className="w-16 h-16 mx-auto mb-4 text-gray-400"><Film /></div>
                                         <p className="text-gray-600 mb-2">カメラロールから動画を選択</p>
-                                        <p className="text-xs text-green-600 mb-4">✅ サイズ制限なし！</p>
                                         <label className="bg-purple-500 hover:bg-purple-600 text-white px-6 py-3 rounded-xl cursor-pointer inline-block transition-all transform hover:scale-105">
                                             動画を選択
                                             <input
@@ -532,7 +562,6 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                            {/* プレビュー動画 */}
                                             <video
                                                 ref={videoRef}
                                                 src={videoUrl}
@@ -549,7 +578,7 @@
                                             >
                                                 <div className="w-8 h-8">{isPlaying ? <Pause /> : <Play />}</div>
                                                 <span className="text-sm font-semibold">
-                                                    {isPlaying ? '一時停止' : '再生'}
+                                                    {isPlaying ? '停止' : '再生'}
                                                 </span>
                                             </button>
 
@@ -573,13 +602,12 @@
                                             </label>
                                         </div>
 
-                                        {/* 全画面表示ボタン */}
                                         <button
                                             onClick={toggleDisplay}
                                             className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white rounded-xl p-4 flex items-center justify-center gap-3 transition-all transform hover:scale-105 mb-4"
                                         >
                                             <div className="w-6 h-6"><Maximize /></div>
-                                            <span className="font-bold text-lg">全画面表示（AirPlay用）</span>
+                                            <span className="font-bold text-lg">全画面表示（横向き）</span>
                                         </button>
                                     </div>
                                 )}
@@ -591,16 +619,15 @@
                                     <span>接続状態</span>
                                 </div>
                                 <div className={`p-3 rounded-lg text-center ${cameraConnected ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                                    📱 スマホB（カメラ） {cameraConnected ? '✓ 接続済み' : '待機中'}
+                                    📱 スマホB（カメラ） {cameraConnected ? '✓ 接続済み' : '待機中...'}
                                 </div>
                             </div>
 
                             <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-gray-700">
-                                <strong>📺 AirPlayの手順:</strong><br/>
-                                1. 「全画面表示」ボタンをタップ<br/>
-                                2. コントロールセンターを開く<br/>
-                                3. 「画面ミラーリング」をタップ<br/>
-                                4. Apple TV/テレビを選択
+                                <strong>📺 使い方:</strong><br/>
+                                1. 「全画面表示」をタップ<br/>
+                                2. 画面が横向きで表示される<br/>
+                                3. AirPlayでテレビに接続
                             </div>
                         </div>
                     </div>
@@ -685,7 +712,7 @@
                                     </div>
                                     <div className="flex items-center gap-2 text-sm text-green-400">
                                         <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-                                        <span>カメラ映像を送信中...</span>
+                                        <span>映像を送信中...</span>
                                     </div>
                                 </div>
                             </div>
