@@ -7,42 +7,31 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
   <div id="app">
-
-    <!-- 左パネル：見本動画 -->
     <div class="panel" id="panel-left">
       <div class="panel-label">見本</div>
-      <video id="reference-video" playsinline></video>
+      <video id="reference-video" playsinline webkit-playsinline></video>
       <div id="upload-area" class="upload-area">
         <p>タップして<br>見本動画を選択</p>
         <input type="file" id="file-input" accept="video/*">
       </div>
     </div>
-
-    <!-- 右パネル：カメラ -->
     <div class="panel" id="panel-right">
       <div class="panel-label">自分</div>
-      <video id="camera-video" autoplay playsinline muted></video>
+      <video id="camera-video" autoplay playsinline webkit-playsinline muted></video>
     </div>
-
   </div>
-
-  <!-- コントロールバー -->
   <div id="controls">
     <button id="btn-play">再生</button>
     <button id="btn-pause">停止</button>
-
     <div class="speed-control">
       <span>速度</span>
       <button class="speed-btn" data-speed="0.5">0.5x</button>
       <button class="speed-btn" data-speed="0.75">0.75x</button>
       <button class="speed-btn active" data-speed="1">1x</button>
     </div>
-
     <button id="btn-camera">カメラ切替</button>
   </div>
-
   <script src="script.js"></script>
 </body>
 </html>
