@@ -116,3 +116,22 @@ html, body {
   background: #4a90d9 !important;
   color: #fff !important;
 }
+
+.upload-area.has-video {
+  background: rgba(0,0,0,0.5);
+  height: 40px;
+  bottom: 0;
+  top: auto;
+  font-size: 12px;
+  padding: 4px;
+}
+
+.upload-area.has-video p {
+  display: none;
+}
+
+.upload-area.has-video::after {
+  content: '動画を変更';
+  color: #aaa;
+  font-size: 12px;
+}
