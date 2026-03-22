@@ -36,6 +36,10 @@ html, body {
   object-fit: cover;
 }
 
+#camera-video {
+  transform: scaleX(-1);
+}
+
 .panel-label {
   position: absolute;
   top: 8px;
