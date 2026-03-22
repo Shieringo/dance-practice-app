@@ -10,20 +10,26 @@ const speedBtns = document.querySelectorAll('.speed-btn');
 let currentStream = null;
 let facingMode = 'user';
 
-// カメラ起動
+// カメラ起動（ボタンタップ後に実行）
 async function startCamera(facing) {
   if (currentStream) {
     currentStream.getTracks().forEach(t => t.stop());
   }
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: facing },
+    const constraints = {
+      video: {
+        facingMode: facing,
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      },
       audio: false
-    });
+    };
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
     currentStream = stream;
     cameraVideo.srcObject = stream;
+    await cameraVideo.play();
   } catch (e) {
-    alert('カメラの起動に失敗しました。ブラウザのカメラ許可を確認してください。');
+    alert('カメラエラー：' + e.message);
   }
 }
 
@@ -33,36 +39,22 @@ btnCamera.addEventListener('click', () => {
   startCamera(facingMode);
 });
 
-// 見本動画の読み込み（何度でも変更可能）
+// 見本動画の読み込み
 fileInput.addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (!file) return;
-
-  // 古いURLを解放してメモリリークを防ぐ
   if (referenceVideo.src) {
     URL.revokeObjectURL(referenceVideo.src);
   }
-
   const url = URL.createObjectURL(file);
   referenceVideo.src = url;
   referenceVideo.load();
-
-  // 読み込み完了後に再生（スマホ対応）
-  referenceVideo.addEventListener('canplay', () => {
-    referenceVideo.play().catch(() => {
-      // 自動再生がブロックされた場合は再生ボタンで対応
-    });
-  }, { once: true });
-
-  // アップロードエリアは残したまま小さく表示
   uploadArea.classList.add('has-video');
 });
 
 // 再生・停止
 btnPlay.addEventListener('click', () => {
-  referenceVideo.play().catch(() => {
-    alert('再生できませんでした。動画を選択してください。');
-  });
+  referenceVideo.play().catch(e => alert('再生エラー：' + e.message));
 });
 btnPause.addEventListener('click', () => referenceVideo.pause());
 
@@ -71,4 +63,11 @@ speedBtns.forEach(btn => {
   btn.addEventListener('click', () => {
     speedBtns.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    refer
+    referenceVideo.playbackRate = parseFloat(btn.dataset.speed);
+  });
+});
+
+// ページ読み込み時にカメラ起動
+window.addEventListener('load', () => {
+  startCamera(facingMode);
+});
