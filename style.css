@@ -1,1 +1,118 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
 
+html, body {
+  width: 100%;
+  height: 100%;
+  background: #000;
+  overflow: hidden;
+  font-family: sans-serif;
+}
+
+#app {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  height: calc(100vh - 60px);
+}
+
+.panel {
+  position: relative;
+  flex: 1;
+  background: #111;
+  overflow: hidden;
+}
+
+.panel + .panel {
+  border-left: 2px solid #333;
+}
+
+.panel video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.panel-label {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 10;
+  background: rgba(0,0,0,0.5);
+  color: #fff;
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.upload-area {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  color: #aaa;
+  font-size: 16px;
+  text-align: center;
+  cursor: pointer;
+  gap: 12px;
+}
+
+.upload-area input[type="file"] {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.upload-area.hidden {
+  display: none;
+}
+
+/* コントロールバー */
+#controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 60px;
+  background: #1a1a1a;
+  padding: 0 16px;
+}
+
+#controls button {
+  background: #333;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+#controls button:active {
+  background: #555;
+}
+
+.speed-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #aaa;
+  font-size: 13px;
+}
+
+.speed-btn {
+  background: #333 !important;
+  font-size: 13px !important;
+  padding: 6px 10px !important;
+}
+
+.speed-btn.active {
+  background: #4a90d9 !important;
+  color: #fff !important;
+}
