@@ -16,7 +16,7 @@ html, body {
   display: flex;
   flex-direction: row;
   width: 100%;
-  height: calc(100vh - 60px);
+  height: calc(100% - 56px);
 }
 
 .panel {
@@ -38,13 +38,13 @@ html, body {
 
 .panel-label {
   position: absolute;
-  top: 10px;
-  left: 10px;
+  top: 8px;
+  left: 8px;
   z-index: 10;
-  background: rgba(0,0,0,0.5);
+  background: rgba(0,0,0,0.6);
   color: #fff;
-  font-size: 13px;
-  padding: 4px 10px;
+  font-size: 12px;
+  padding: 3px 10px;
   border-radius: 20px;
 }
 
@@ -56,7 +56,7 @@ html, body {
   justify-content: center;
   flex-direction: column;
   color: #aaa;
-  font-size: 16px;
+  font-size: 15px;
   text-align: center;
   cursor: pointer;
   gap: 12px;
@@ -69,61 +69,13 @@ html, body {
   cursor: pointer;
 }
 
-.upload-area.hidden {
-  display: none;
-}
-
-/* コントロールバー */
-#controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  height: 60px;
-  background: #1a1a1a;
-  padding: 0 16px;
-}
-
-#controls button {
-  background: #333;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 18px;
-  font-size: 15px;
-  cursor: pointer;
-}
-
-#controls button:active {
-  background: #555;
-}
-
-.speed-control {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #aaa;
-  font-size: 13px;
-}
-
-.speed-btn {
-  background: #333 !important;
-  font-size: 13px !important;
-  padding: 6px 10px !important;
-}
-
-.speed-btn.active {
-  background: #4a90d9 !important;
-  color: #fff !important;
-}
-
 .upload-area.has-video {
-  background: rgba(0,0,0,0.5);
-  height: 40px;
-  bottom: 0;
   top: auto;
+  bottom: 0;
+  height: 36px;
+  background: rgba(0,0,0,0.5);
+  flex-direction: row;
   font-size: 12px;
-  padding: 4px;
 }
 
 .upload-area.has-video p {
@@ -134,4 +86,56 @@ html, body {
   content: '動画を変更';
   color: #aaa;
   font-size: 12px;
+  pointer-events: none;
+}
+
+/* コントロールバー */
+#controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 56px;
+  background: #1a1a1a;
+  padding: 0 12px;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+#controls button {
+  background: #333;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 7px 14px;
+  font-size: 14px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+#controls button:active {
+  background: #555;
+}
+
+.speed-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: #aaa;
+  font-size: 12px;
+}
+
+.speed-btn {
+  background: #333 !important;
+  font-size: 12px !important;
+  padding: 6px 8px !important;
+}
+
+.speed-btn.active {
+  background: #4a90d9 !important;
+  color: #fff !important;
 }
