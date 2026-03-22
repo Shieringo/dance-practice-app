@@ -8,7 +8,7 @@ const btnCamera = document.getElementById('btn-camera');
 const speedBtns = document.querySelectorAll('.speed-btn');
 
 let currentStream = null;
-let facingMode = 'user'; // フロントカメラ
+let facingMode = 'user';
 
 // カメラ起動
 async function startCamera(facing) {
@@ -27,24 +27,43 @@ async function startCamera(facing) {
   }
 }
 
-// カメラ切替ボタン
+// カメラ切替
 btnCamera.addEventListener('click', () => {
   facingMode = facingMode === 'user' ? 'environment' : 'user';
   startCamera(facingMode);
 });
 
-// 見本動画の読み込み
+// 見本動画の読み込み（何度でも変更可能）
 fileInput.addEventListener('change', (e) => {
   const file = e.target.files[0];
   if (!file) return;
+
+  // 古いURLを解放してメモリリークを防ぐ
+  if (referenceVideo.src) {
+    URL.revokeObjectURL(referenceVideo.src);
+  }
+
   const url = URL.createObjectURL(file);
   referenceVideo.src = url;
   referenceVideo.load();
-  uploadArea.classList.add('hidden');
+
+  // 読み込み完了後に再生（スマホ対応）
+  referenceVideo.addEventListener('canplay', () => {
+    referenceVideo.play().catch(() => {
+      // 自動再生がブロックされた場合は再生ボタンで対応
+    });
+  }, { once: true });
+
+  // アップロードエリアは残したまま小さく表示
+  uploadArea.classList.add('has-video');
 });
 
 // 再生・停止
-btnPlay.addEventListener('click', () => referenceVideo.play());
+btnPlay.addEventListener('click', () => {
+  referenceVideo.play().catch(() => {
+    alert('再生できませんでした。動画を選択してください。');
+  });
+});
 btnPause.addEventListener('click', () => referenceVideo.pause());
 
 // 速度調整
@@ -52,9 +71,4 @@ speedBtns.forEach(btn => {
   btn.addEventListener('click', () => {
     speedBtns.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    referenceVideo.playbackRate = parseFloat(btn.dataset.speed);
-  });
-});
-
-// 起動時にカメラ開始
-startCamera(facingMode);
+    refer
