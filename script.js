@@ -9,8 +9,13 @@ const speedBtns = document.querySelectorAll('.speed-btn');
 
 let currentStream = null;
 let facingMode = 'user';
+let currentZoom = 0.5;
+let pinchStartDist = 0;
+let pinchStartZoom = 1;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 2;
 
-// カメラ起動（ボタンタップ後に実行）
+// カメラ起動
 async function startCamera(facing) {
   if (currentStream) {
     currentStream.getTracks().forEach(t => t.stop());
@@ -28,10 +33,46 @@ async function startCamera(facing) {
     currentStream = stream;
     cameraVideo.srcObject = stream;
     await cameraVideo.play();
+    currentZoom = 0.5;
+    applyZoom(0.5);
   } catch (e) {
     alert('カメラエラー：' + e.message);
   }
 }
+
+// ズーム適用（デジタルズーム）
+function applyZoom(zoom) {
+  currentZoom = Math.min(Math.max(zoom, MIN_ZOOM), MAX_ZOOM);
+  const scale = facingMode === 'user' ? `scaleX(-1) scale(${currentZoom})` : `scale(${currentZoom})`;
+  cameraVideo.style.transform = scale;
+}
+
+// 2点間の距離を計算
+function getPinchDist(touches) {
+  const dx = touches[0].clientX - touches[1].clientX;
+  const dy = touches[0].clientY - touches[1].clientY;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+// ピンチイン/アウト
+const rightPanel = document.getElementById('panel-right');
+
+rightPanel.addEventListener('touchstart', (e) => {
+  if (e.touches.length === 2) {
+    pinchStartDist = getPinchDist(e.touches);
+    pinchStartZoom = currentZoom;
+    e.preventDefault();
+  }
+}, { passive: false });
+
+rightPanel.addEventListener('touchmove', (e) => {
+  if (e.touches.length === 2) {
+    const dist = getPinchDist(e.touches);
+    const ratio = dist / pinchStartDist;
+    applyZoom(pinchStartZoom * ratio);
+    e.preventDefault();
+  }
+}, { passive: false });
 
 // カメラ切替
 btnCamera.addEventListener('click', () => {
