@@ -10,10 +10,6 @@ const speedBtns = document.querySelectorAll('.speed-btn');
 let currentStream = null;
 let facingMode = 'user';
 let currentZoom = 0.5;
-let pinchStartDist = 0;
-let pinchStartZoom = 1;
-const MIN_ZOOM = 0.5;
-const MAX_ZOOM = 2;
 
 // カメラ起動
 async function startCamera(facing) {
@@ -46,24 +42,6 @@ function applyZoom(zoom) {
   const scale = facingMode === 'user' ? `scaleX(-1) scale(${currentZoom})` : `scale(${currentZoom})`;
   cameraVideo.style.transform = scale;
 }
-
-// 2点間の距離を計算
-function getPinchDist(touches) {
-  const dx = touches[0].clientX - touches[1].clientX;
-  const dy = touches[0].clientY - touches[1].clientY;
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
-// ピンチイン/アウト
-const rightPanel = document.getElementById('panel-right');
-
-rightPanel.addEventListener('touchstart', (e) => {
-  if (e.touches.length === 2) {
-    pinchStartDist = getPinchDist(e.touches);
-    pinchStartZoom = currentZoom;
-    e.preventDefault();
-  }
-}, { passive: false });
 
 rightPanel.addEventListener('touchmove', (e) => {
   if (e.touches.length === 2) {
