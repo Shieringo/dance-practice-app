@@ -9,7 +9,12 @@ const speedBtns = document.querySelectorAll('.speed-btn');
 
 let currentStream = null;
 let facingMode = 'user';
-let currentZoom = 0.5;
+
+// ズーム適用
+function applyZoom(zoom) {
+  const scale = facingMode === 'user' ? `scaleX(-1) scale(${zoom})` : `scale(${zoom})`;
+  cameraVideo.style.transform = scale;
+}
 
 // カメラ起動
 async function startCamera(facing) {
@@ -29,28 +34,11 @@ async function startCamera(facing) {
     currentStream = stream;
     cameraVideo.srcObject = stream;
     await cameraVideo.play();
-    currentZoom = 0.5;
     applyZoom(0.5);
   } catch (e) {
     alert('カメラエラー：' + e.message);
   }
 }
-
-// ズーム適用（デジタルズーム）
-function applyZoom(zoom) {
-  currentZoom = Math.min(Math.max(zoom, MIN_ZOOM), MAX_ZOOM);
-  const scale = facingMode === 'user' ? `scaleX(-1) scale(${currentZoom})` : `scale(${currentZoom})`;
-  cameraVideo.style.transform = scale;
-}
-
-rightPanel.addEventListener('touchmove', (e) => {
-  if (e.touches.length === 2) {
-    const dist = getPinchDist(e.touches);
-    const ratio = dist / pinchStartDist;
-    applyZoom(pinchStartZoom * ratio);
-    e.preventDefault();
-  }
-}, { passive: false });
 
 // カメラ切替
 btnCamera.addEventListener('click', () => {
