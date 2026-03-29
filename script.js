@@ -10,13 +10,7 @@ const speedBtns = document.querySelectorAll('.speed-btn');
 let currentStream = null;
 let facingMode = 'user';
 
-// ズーム適用
-function applyZoom(zoom) {
-  const scale = facingMode === 'user' ? `scaleX(-1) scale(${zoom})` : `scale(${zoom})`;
-  cameraVideo.style.transform = scale;
-}
-
-// カメラ起動
+// カメラ起動（ボタンタップ後に実行）
 async function startCamera(facing) {
   if (currentStream) {
     currentStream.getTracks().forEach(t => t.stop());
@@ -34,7 +28,6 @@ async function startCamera(facing) {
     currentStream = stream;
     cameraVideo.srcObject = stream;
     await cameraVideo.play();
-    applyZoom(0.5);
   } catch (e) {
     alert('カメラエラー：' + e.message);
   }
